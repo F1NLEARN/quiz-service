@@ -13,11 +13,43 @@ spring:
     password: ${DB_PASSWORD:}
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+  
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      acks: all
+    consumer:
+      group-id: quiz-etl-group
+      auto-offset-reset: earliest
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY} # 임베딩에 사용
+      chat:
+        enabled: true
+        api-key: ${GEMINI_API_KEY} # 채팅은 제미나이 키 사용
+        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+        options:
+          model: gemini-3.1-flash-lite-preview
+      embedding:
+        options:
+          model: text-embedding-3-small
+    chat:
+      memory:
+        repository:
+          jdbc:
+            initialize-schema: always
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+        initialize-schema: false #pgvector/pgvector:pg17 추가해야할듯
 
 eureka:
   instance:
@@ -36,3 +68,8 @@ management:
   endpoint:
     health:
       show-details: always
+
+wiki:
+  api:
+    base-url: https://ko.wikipedia.org/w/api.php
+    contact-email: ${WIKI_CONTACT_EMAIL}
