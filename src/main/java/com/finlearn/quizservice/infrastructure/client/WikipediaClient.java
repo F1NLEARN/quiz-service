@@ -1,6 +1,7 @@
 package com.finlearn.quizservice.infrastructure.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.finlearn.quizservice.application.port.out.WikipediaPort;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -8,48 +9,57 @@ import org.springframework.web.client.RestClient;
 
 @Slf4j
 @Component
-public class WikipediaClient {
+public class WikipediaClient implements WikipediaPort {
 
     private final RestClient restClient;
+    private final String webUrlPrefix;
 
     public WikipediaClient(@Value("${wiki.api.base-url}") String baseUrl,
-            @Value("${wiki.api.contact-email}") String contactEmail) {
-        log.info("WikipediaClient 초기화 - URL: {}, 연락처: {}", baseUrl, contactEmail);
+            @Value("${wiki.api.contact-email}") String contactEmail,
+            @Value("${wiki.web-url-prefix}") String webUrlPrefix) {
         this.restClient = RestClient.builder().baseUrl(baseUrl)
                 .defaultHeader("User-Agent", "F1NLEARN-QuizBot/1.0 (" + contactEmail + ")").build();
+        this.webUrlPrefix = webUrlPrefix;
     }
 
+    @Override
     public String fetchArticleContent(String keyword) {
         log.info("위키피디아에서 '{}' 문서의 본문 수집 시작", keyword);
 
         try {
-            JsonNode response = restClient.get().uri(uriBuilder -> uriBuilder/* 데이터 줘라 */.queryParam("action", "query")
-                    /* 본문(extracts) 줘라 */.queryParam("prop", "extracts")
-                    /* HTML 태그 없는 순수 텍스트로 줘라 */.queryParam("explaintext", "1")/* 검색어 */.queryParam("titles", keyword)
-                    /* 응답은 JSON으로 */.queryParam("format", "json").build()).retrieve().body(JsonNode.class);
+            JsonNode response = restClient.get()
+                    .uri(uriBuilder -> uriBuilder/* 데이터 줘라 */.queryParam("action", "query")
+                            /* 본문(extracts) 줘라 */.queryParam("prop", "extracts")
+                            /* HTML 태그 없는 순수 텍스트로 줘라 */.queryParam("explaintext", "1")
+                            /* 동의어면 자동 이동해라 */.queryParam("redirects", "1")/* 검색어 */.queryParam("titles", keyword)
+                            /* 응답은 JSON으로 */.queryParam("format", "json").build())
+                    .retrieve().body(JsonNode.class);
 
-            if (response != null && response.has("query") && response.get("query").has("pages")) {
-                JsonNode pages = response.get("query").get("pages");
-                if (pages.properties().iterator().hasNext()) {
-                    JsonNode page = pages.properties().iterator().next().getValue();
+            log.debug("위키피디아 API 응답 결과: {}", response);
 
-                    if (page.has("missing")) {
-                        log.warn("'{}' 문서를 찾을 수 없습니다.", keyword);
-                        return null;
-                    }
-
-                    if (page.has("extract")) {
-                        String extract = page.get("extract").asText();
-                        log.info("'{}' 문서 수집 완료 ({} 글자)", keyword, extract.length());
-                        return extract;
-                    }
-                }
+            // 비정상 응답
+            if (response == null || !response.has("query") || !response.get("query").has("pages")
+                    || response.get("query").get("pages").isEmpty()
+                    || response.get("query").get("pages").elements().next().has("missing")) {
+                log.warn("위키피디아에서 '{}' 문서를 수집 불가 (데이터 없음)", keyword);
+                return null;
             }
+
+            // 정상 응답
+            JsonNode firstPage = response.get("query").get("pages").elements().next();
+            if (firstPage.has("extract")) {
+                return firstPage.get("extract").asText();
+            }
+
         } catch (Exception e) {
             log.error("위키피디아 API 호출 중 오류 발생: {}", e.getMessage());
         }
 
-        log.warn("'{}' 문서에서 본문을 추출하지 못했습니다.", keyword);
         return null;
+    }
+
+    @Override
+    public String generateArticleUrl(String keyword) {
+        return webUrlPrefix + keyword.replace(" ", "_");
     }
 }

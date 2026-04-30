@@ -76,3 +76,4 @@ wiki:
   api:
     base-url: https://ko.wikipedia.org/w/api.php
     contact-email: ${WIKI_CONTACT_EMAIL}
+  web-url-prefix: https://ko.wikipedia.org/wiki/

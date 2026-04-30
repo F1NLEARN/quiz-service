@@ -57,8 +57,8 @@ public class Quiz extends BaseEntity {
     private String subTopic;
 
     @Builder
-    public Quiz(UUID quizTopicId, String title, String question, String answerExplanation, 
-                UUID crawledSourceId, List<QuizChoice> choices, MainTopic mainTopic, String subTopic) {
+    public Quiz(UUID quizTopicId, String title, String question, String answerExplanation, UUID crawledSourceId,
+            List<QuizChoice> choices, MainTopic mainTopic, String subTopic) {
         this.quizTopicId = quizTopicId;
         this.title = title;
         this.question = question;

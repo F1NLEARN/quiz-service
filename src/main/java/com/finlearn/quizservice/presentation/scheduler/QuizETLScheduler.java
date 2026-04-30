@@ -2,7 +2,6 @@ package com.finlearn.quizservice.presentation.scheduler;
 
 import com.finlearn.quizservice.application.service.QuizTopicGeneratorService;
 import com.finlearn.quizservice.application.service.WikiCrawlerService;
-import com.finlearn.quizservice.domain.enums.MainTopic;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,8 +12,6 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class QuizETLScheduler {
 
-    private static final int TOPIC_COUNT_PER_BATCH = 10;
-
     private final QuizTopicGeneratorService quizTopicGeneratorService;
     private final WikiCrawlerService wikiCrawlerService;
 
@@ -24,10 +21,7 @@ public class QuizETLScheduler {
     public void generateNewKeywords() {
         log.info("[키워드 Scheduler] 새로운 퀴즈 키워드 생성 시작");
         try {
-            for (MainTopic topic : MainTopic.values()) {
-                log.info("[키워드 Scheduler] '{}' 대주제를 가지고 소주제 생성", topic);
-                quizTopicGeneratorService.generateAndSaveTopics(topic, TOPIC_COUNT_PER_BATCH);
-            }
+            quizTopicGeneratorService.generateAllTopicsKeywords();
             log.info("[키워드 Scheduler] 키워드 생성 오류 없이 성공");
         } catch (Exception e) {
             log.error("[키워드 Scheduler] 키워드 생성 중 오류 발생: {}", e.getMessage());

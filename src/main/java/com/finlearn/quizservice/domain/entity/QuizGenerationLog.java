@@ -65,10 +65,9 @@ public class QuizGenerationLog extends BaseEntity {
     private String quizSubTopic;
 
     @Builder
-    public QuizGenerationLog(UUID crawledSourceId, UUID quizId, QuizGenerationStatus status, 
-                             String errorMessage, String quizTitle, String quizQuestion, 
-                             String quizAnswerExplanation, List<QuizChoice> quizChoices, 
-                             MainTopic quizMainTopic, String quizSubTopic) {
+    public QuizGenerationLog(UUID crawledSourceId, UUID quizId, QuizGenerationStatus status, String errorMessage,
+            String quizTitle, String quizQuestion, String quizAnswerExplanation, List<QuizChoice> quizChoices,
+            MainTopic quizMainTopic, String quizSubTopic) {
         this.crawledSourceId = crawledSourceId;
         this.quizId = quizId;
         this.status = status != null ? status : QuizGenerationStatus.FAILED;
