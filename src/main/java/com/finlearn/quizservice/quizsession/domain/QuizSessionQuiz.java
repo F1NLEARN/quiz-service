@@ -36,6 +36,22 @@ public class QuizSessionQuiz {
     }
 
     /**
+     * DB에서 읽어온 데이터로 도메인 객체를 재구성한다.
+     * Infrastructure 레이어(Repository 구현체)에서만 호출한다.
+     */
+    public static QuizSessionQuiz reconstruct(QuizSessionQuizId id, QuizId quizId, int orderNo,
+                                       Integer submitted, boolean conceptIncluded,
+                                       Boolean correct, OffsetDateTime answeredAt) {
+        QuizSessionQuiz quiz = new QuizSessionQuiz(id, quizId, orderNo);
+        // DB 저장 값으로 상태 복원
+        quiz.submitted = submitted;
+        quiz.conceptIncluded = conceptIncluded;
+        quiz.correct = correct;
+        quiz.answeredAt = answeredAt;
+        return quiz;
+    }
+
+    /**
      * 답안을 제출하고 정오답을 기록한다.
      * QuizSession.submitAnswer()에서만 호출한다.
      *

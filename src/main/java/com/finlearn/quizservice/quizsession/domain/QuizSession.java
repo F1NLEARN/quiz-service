@@ -72,6 +72,29 @@ public class QuizSession {
     }
 
     /**
+     * DB에서 읽어온 데이터로 도메인 객체를 재구성한다.
+     * Infrastructure 레이어(Repository 구현체)에서만 호출한다.
+     * createLearning/createPoint와 달리 새 ID·시각을 생성하지 않는다.
+     */
+    public static QuizSession reconstruct(
+            QuizSessionId id, UserId userId, SessionType sessionType, QuizCategory category,
+            int totalCount, int correctCount, Score score, PassStatus passStatus,
+            SeedMoney seedMoney, OffsetDateTime startedAt, OffsetDateTime endedAt,
+            List<QuizSessionQuiz> quizzes) {
+        QuizSession session = new QuizSession(id, userId, sessionType, category, List.of());
+        // 실제 퀴즈 목록으로 교체
+        session.quizzes.clear();
+        session.quizzes.addAll(quizzes);
+        // DB 저장 값으로 상태 복원
+        session.correctCount = correctCount;
+        session.score = score;
+        session.passStatus = passStatus;
+        session.seedMoney = seedMoney;
+        session.endedAt = endedAt;
+        return session;
+    }
+
+    /**
      * 학습 퀴즈 세션을 생성한다.
      *
      * @param userId    세션 소유자 ID
