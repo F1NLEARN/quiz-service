@@ -27,6 +27,14 @@ public record Score(int value) {
         return new Score(correctCount * 100 / totalCount);
     }
 
+    /**
+     * DB에서 읽어온 점수 값으로 Score를 직접 생성한다.
+     * Infrastructure 레이어(Repository 구현체)에서만 호출한다.
+     */
+    public static Score ofValue(int value) {
+        return new Score(value);
+    }
+
     /** 포인트 퀴즈 합격 여부 (70점 이상) */
     public boolean isPassing() {
         return value >= PASS_THRESHOLD;
