@@ -29,16 +29,15 @@ spring:
 
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY} # 임베딩에 사용
+      base-url: https://generativelanguage.googleapis.com/v1beta/openai/
+      api-key: ${GEMINI_API_KEY_TEST}
       chat:
-        enabled: true
-        api-key: ${GEMINI_API_KEY} # 채팅은 제미나이 키 사용
-        base-url: https://generativelanguage.googleapis.com/v1beta/openai/
         options:
-          model: gemini-3.1-flash-lite-preview
+            model: gemini-3.1-flash-lite-preview
       embedding:
         options:
-          model: text-embedding-3-small
+            model: gemini-embedding-2
+            dimensions: 1536
     chat:
       memory:
         repository:
@@ -49,7 +48,7 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 1536
-        initialize-schema: false #pgvector/pgvector:pg17 추가해야할듯
+        initialize-schema: true
 
 eureka:
   instance:
