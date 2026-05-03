@@ -19,7 +19,9 @@ import com.finlearn.quizservice.quizsession.domain.vo.UserId;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * 퀴즈 세션 Aggregate Root.
@@ -234,6 +236,16 @@ public class QuizSession {
         // 내부 목록 초기화 (재발행 방지)
         events.clear();
         return copy;
+    }
+
+    /**
+     * 아직 답안이 제출되지 않은 문제 중 orderNo가 가장 낮은 문제를 반환한다.
+     * 모든 문제를 풀었으면 Optional.empty()를 반환한다.
+     */
+    public Optional<QuizSessionQuiz> findNextUnanswered() {
+        return quizzes.stream()
+                .filter(q -> !q.isAnswered())
+                .min(Comparator.comparingInt(QuizSessionQuiz::getOrderNo));
     }
 
     /** 개념 정리 대상 문제가 1개 이상인지 확인한다 */

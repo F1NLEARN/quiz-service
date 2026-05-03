@@ -17,7 +17,9 @@ public enum QuizSessionErrorCode {
     INVALID_SESSION_STATE(HttpStatus.BAD_REQUEST, "QUIZ_SESSION_007", "유효하지 않은 세션 상태 전이입니다."),
     CONCEPT_SUMMARY_NOT_FOUND(HttpStatus.NOT_FOUND, "QUIZ_SESSION_008", "개념 정리를 찾을 수 없습니다."),
     LEARNING_QUIZ_ONLY(HttpStatus.BAD_REQUEST, "QUIZ_SESSION_009", "학습 퀴즈 세션에서만 사용할 수 있는 기능입니다."),
-    INVALID_CATEGORY(HttpStatus.BAD_REQUEST, "QUIZ_SESSION_010", "유효하지 않은 카테고리입니다.");
+    INVALID_CATEGORY(HttpStatus.BAD_REQUEST, "QUIZ_SESSION_010", "유효하지 않은 카테고리입니다."),
+    QUIZ_NOT_FOUND(HttpStatus.NOT_FOUND, "QUIZ_SESSION_011", "문제를 찾을 수 없습니다."),
+    NO_REMAINING_QUIZ(HttpStatus.BAD_REQUEST, "QUIZ_SESSION_012", "풀 수 있는 문제가 없습니다.");
 
     private final HttpStatus httpStatus;
     private final String code;
