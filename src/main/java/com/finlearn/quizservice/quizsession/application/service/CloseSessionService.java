@@ -1,6 +1,5 @@
 package com.finlearn.quizservice.quizsession.application.service;
 
-import com.finlearn.quizservice.infrastructure.repository.QuizJpaRepository;
 import com.finlearn.quizservice.quizsession.application.command.CloseSessionCommand;
 import com.finlearn.quizservice.quizsession.domain.QuizSession;
 import com.finlearn.quizservice.quizsession.domain.exception.QuizSessionErrorCode;
@@ -25,12 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 public class CloseSessionService {
 
     private final QuizSessionRepository quizSessionRepository;
-    private final QuizJpaRepository quizJpaRepository;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 세션을 종료하고 결과를 반환한다.
-     * 학습 퀴즈는 문제별 정오답·해설을 포함하고, 포인트 퀴즈는 점수·시드머니만 반환한다.
      */
     @Transactional
     public CloseSessionResponse closeSession(CloseSessionCommand command) {
@@ -41,26 +38,14 @@ public class CloseSessionService {
         // 세션 타입별 종료 처리
         if (session.getSessionType() == SessionType.LEARNING) {
             session.closeAsLearning();
-            quizSessionRepository.save(session);
-            session.pullEvents().forEach(eventPublisher::publishEvent);
-            // 학습 퀴즈: 문제별 정오답·해설 포함 응답
-            return CloseSessionResponse.ofLearning(session, loadQuizContents(session));
         } else {
             session.closeAsPoint(new SeedMoneyPolicy());
-            quizSessionRepository.save(session);
-            // PointQuizPassed 이벤트 발행 (PR #5에서 Kafka 리스너 연결)
-            session.pullEvents().forEach(eventPublisher::publishEvent);
-            // 포인트 퀴즈: 점수·시드머니만 반환
-            return CloseSessionResponse.ofPoint(session);
         }
-    }
 
-    /** 세션에 포함된 문제 ID 목록으로 Quiz 컨텐츠를 일괄 조회한다 */
-    private java.util.List<com.finlearn.quizservice.domain.entity.Quiz> loadQuizContents(QuizSession session) {
-        java.util.List<java.util.UUID> quizIds = session.getQuizzes().stream()
-                .map(q -> q.getQuizId().value())
-                .toList();
-        return quizJpaRepository.findAllById(quizIds);
+        quizSessionRepository.save(session);
+        session.pullEvents().forEach(eventPublisher::publishEvent);
+
+        return CloseSessionResponse.from(session);
     }
 
     private QuizSession findSessionOrThrow(java.util.UUID sessionId) {
