@@ -10,7 +10,6 @@ import com.finlearn.quizservice.quizsession.domain.exception.QuizSessionExceptio
 import com.finlearn.quizservice.quizsession.domain.repository.QuizSessionRepository;
 import com.finlearn.quizservice.quizsession.domain.vo.QuizId;
 import com.finlearn.quizservice.quizsession.domain.vo.QuizSessionId;
-import com.finlearn.quizservice.quizsession.domain.vo.SessionType;
 import com.finlearn.quizservice.quizsession.domain.vo.UserId;
 import com.finlearn.quizservice.quizsession.presentation.dto.SubmitAnswerResponse;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 답안 제출 Application 서비스.
  * 제출된 선택지 번호와 정답을 비교하여 정오답을 판정하고 도메인 이벤트를 발행한다.
- * 학습 퀴즈는 해설을 즉시 반환하고, 포인트 퀴즈는 정오답 여부만 반환한다.
+ * 해설은 챗봇을 통해 제공되므로 응답에 포함하지 않는다.
  */
 @Service
 @RequiredArgsConstructor
@@ -32,8 +31,7 @@ public class SubmitAnswerService {
     private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * 답안을 제출하고 결과를 반환한다.
-     * 세션 타입에 따라 answerExplanation 포함 여부가 결정된다.
+     * 답안을 제출하고 정오답 결과를 반환한다.
      */
     @Transactional
     public SubmitAnswerResponse submitAnswer(SubmitAnswerCommand command) {
@@ -60,13 +58,7 @@ public class SubmitAnswerService {
         // 도메인 이벤트 발행 (Kafka 연동은 PR #5에서 처리)
         session.pullEvents().forEach(eventPublisher::publishEvent);
 
-        // 포인트 퀴즈는 해설 미포함, 학습 퀴즈는 해설 포함
-        String explanation = session.getSessionType() == SessionType.POINT
-                ? null
-                : quiz.getAnswerExplanation();
-
-        return SubmitAnswerResponse.of(command.quizId(), command.submitted(), correct, correctNo,
-                explanation);
+        return SubmitAnswerResponse.of(command.quizId(), command.submitted(), correct, correctNo);
     }
 
     /** choices 목록에서 isCorrect가 true인 선택지의 no를 추출한다 */
