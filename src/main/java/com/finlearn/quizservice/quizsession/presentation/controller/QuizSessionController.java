@@ -2,15 +2,18 @@ package com.finlearn.quizservice.quizsession.presentation.controller;
 
 import com.finlearn.common.response.CommonResponse;
 import com.finlearn.common.util.SecurityUtil;
+import com.finlearn.quizservice.quizsession.application.command.CloseSessionCommand;
 import com.finlearn.quizservice.quizsession.application.command.CreateLearningSessionCommand;
 import com.finlearn.quizservice.quizsession.application.command.CreatePointSessionCommand;
 import com.finlearn.quizservice.quizsession.application.command.GetNextQuizCommand;
 import com.finlearn.quizservice.quizsession.application.command.SubmitAnswerCommand;
+import com.finlearn.quizservice.quizsession.application.service.CloseSessionService;
 import com.finlearn.quizservice.quizsession.application.service.CreateQuizSessionService;
 import com.finlearn.quizservice.quizsession.application.service.GetNextQuizService;
 import com.finlearn.quizservice.quizsession.application.service.SubmitAnswerService;
 import com.finlearn.quizservice.quizsession.presentation.dto.CreateLearningSessionRequest;
 import com.finlearn.quizservice.quizsession.presentation.dto.CreateSessionResponse;
+import com.finlearn.quizservice.quizsession.presentation.dto.CloseSessionResponse;
 import com.finlearn.quizservice.quizsession.presentation.dto.NextQuizResponse;
 import com.finlearn.quizservice.quizsession.presentation.dto.SubmitAnswerRequest;
 import com.finlearn.quizservice.quizsession.presentation.dto.SubmitAnswerResponse;
@@ -37,6 +40,7 @@ public class QuizSessionController {
     private final CreateQuizSessionService createQuizSessionService;
     private final GetNextQuizService getNextQuizService;
     private final SubmitAnswerService submitAnswerService;
+    private final CloseSessionService closeSessionService;
 
     /**
      * 학습 퀴즈 세션을 생성한다.
@@ -92,5 +96,16 @@ public class QuizSessionController {
         );
         SubmitAnswerResponse response = submitAnswerService.submitAnswer(command);
         return CommonResponse.success("답안이 제출되었습니다.", response);
+    }
+
+    /**
+     * 퀴즈 세션을 종료한다.
+     * POST /api/v1/quiz-sessions/{sessionId}/close
+     */
+    @PostMapping("/{sessionId}/close")
+    public CommonResponse<CloseSessionResponse> closeSession(@PathVariable UUID sessionId) {
+        CloseSessionCommand command = new CloseSessionCommand(sessionId, SecurityUtil.getCurrentUserId());
+        CloseSessionResponse response = closeSessionService.closeSession(command);
+        return CommonResponse.success("퀴즈 세션이 종료되었습니다.", response);
     }
 }
