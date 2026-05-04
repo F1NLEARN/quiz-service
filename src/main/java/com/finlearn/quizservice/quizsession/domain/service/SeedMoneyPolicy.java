@@ -4,13 +4,20 @@ import com.finlearn.quizservice.quizsession.domain.vo.Score;
 import com.finlearn.quizservice.quizsession.domain.vo.SeedMoney;
 
 /**
- * 포인트 퀴즈 합격 시 시드머니 산정 도메인 서비스 인터페이스.
- * 점수 구간에 따른 지급 금액 정책이 미정이므로 인터페이스만 정의하고 구현은 TODO 처리한다.
- * Infrastructure 레이어에서 구현체를 제공한다.
+ * 포인트 퀴즈 합격 시 시드머니 산정 도메인 서비스.
+ * 점수 구간에 따라 지급할 시드머니를 결정한다.
  *
- * TODO: 점수 구간별 시드머니 금액 정책 확정 후 구현체 작성 필요
+ * 70 ~ 79점: 100만원
+ * 80 ~ 89점: 150만원
+ * 90 ~ 99점: 200만원
+ * 100점:     400만원
  */
-public interface SeedMoneyPolicy {
+public class SeedMoneyPolicy {
+
+    private static final long TIER_70 = 1_000_000L;
+    private static final long TIER_80 = 1_500_000L;
+    private static final long TIER_90 = 2_000_000L;
+    private static final long TIER_100 = 4_000_000L;
 
     /**
      * 점수에 따라 지급할 시드머니를 산정한다.
@@ -19,5 +26,17 @@ public interface SeedMoneyPolicy {
      * @param score 포인트 퀴즈 최종 점수 (70점 이상)
      * @return 지급할 시드머니
      */
-    SeedMoney calculate(Score score);
+    public SeedMoney calculate(Score score) {
+        int value = score.value();
+        // 점수 구간에 따라 시드머니 결정
+        if (value == 100) {
+            return SeedMoney.of(TIER_100);
+        } else if (value >= 90) {
+            return SeedMoney.of(TIER_90);
+        } else if (value >= 80) {
+            return SeedMoney.of(TIER_80);
+        } else {
+            return SeedMoney.of(TIER_70);
+        }
+    }
 }

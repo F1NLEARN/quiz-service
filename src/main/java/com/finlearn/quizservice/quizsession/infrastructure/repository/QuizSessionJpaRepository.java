@@ -15,8 +15,8 @@ import java.util.UUID;
 public interface QuizSessionJpaRepository extends JpaRepository<QuizSessionJpaEntity, UUID> {
 
     /**
-     * 해당 월에 완료된(PASS 또는 FAIL) 포인트 퀴즈 세션이 있는지 확인한다.
-     * 포인트 퀴즈 월 1회 제한 검증에 사용된다.
+     * 해당 월에 PASS한 포인트 퀴즈 세션이 있는지 확인한다.
+     * FAIL은 쿨타임 없이 재도전 가능하므로 PASS만 체크한다.
      *
      * @param userId     사용자 UUID
      * @param rangeStart 검사 시작 시각 (해당 월 1일 00:00:00)
@@ -27,7 +27,7 @@ public interface QuizSessionJpaRepository extends JpaRepository<QuizSessionJpaEn
             FROM QuizSessionJpaEntity s
             WHERE s.userId = :userId
               AND s.sessionType = 'POINT'
-              AND s.passStatus IN ('PASS', 'FAIL')
+              AND s.passStatus = 'PASS'
               AND s.startedAt >= :rangeStart
               AND s.startedAt < :rangeEnd
             """)
