@@ -73,6 +73,26 @@ public class QuizSession {
         this.events = new ArrayList<>();
     }
 
+    private QuizSession(QuizSessionId id, UserId userId, SessionType sessionType,
+                        QuizCategory category, int totalCount, int correctCount, Score score,
+                        PassStatus passStatus, SeedMoney seedMoney,
+                        OffsetDateTime startedAt, OffsetDateTime endedAt,
+                        List<QuizSessionQuiz> quizzes) {
+        this.id = id;
+        this.userId = userId;
+        this.sessionType = sessionType;
+        this.category = category;
+        this.totalCount = totalCount;
+        this.correctCount = correctCount;
+        this.score = score;
+        this.passStatus = passStatus;
+        this.seedMoney = seedMoney;
+        this.startedAt = startedAt;
+        this.endedAt = endedAt;
+        this.quizzes = new ArrayList<>(quizzes);
+        this.events = new ArrayList<>();
+    }
+
     /**
      * DB에서 읽어온 데이터로 도메인 객체를 재구성한다.
      * Infrastructure 레이어(Repository 구현체)에서만 호출한다.
@@ -83,17 +103,8 @@ public class QuizSession {
             int totalCount, int correctCount, Score score, PassStatus passStatus,
             SeedMoney seedMoney, OffsetDateTime startedAt, OffsetDateTime endedAt,
             List<QuizSessionQuiz> quizzes) {
-        QuizSession session = new QuizSession(id, userId, sessionType, category, List.of());
-        // 실제 퀴즈 목록으로 교체
-        session.quizzes.clear();
-        session.quizzes.addAll(quizzes);
-        // DB 저장 값으로 상태 복원
-        session.correctCount = correctCount;
-        session.score = score;
-        session.passStatus = passStatus;
-        session.seedMoney = seedMoney;
-        session.endedAt = endedAt;
-        return session;
+        return new QuizSession(id, userId, sessionType, category, totalCount, correctCount,
+                score, passStatus, seedMoney, startedAt, endedAt, quizzes);
     }
 
     /**

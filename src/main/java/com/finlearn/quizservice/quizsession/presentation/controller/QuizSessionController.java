@@ -33,7 +33,7 @@ import java.util.UUID;
  * 세션 생성, 다음 문제 조회, 답안 제출 엔드포인트를 제공한다.
  */
 @RestController
-@RequestMapping("/api/v1/quiz-sessions")
+@RequestMapping("/api/quiz/sessions")
 @RequiredArgsConstructor
 public class QuizSessionController {
 
