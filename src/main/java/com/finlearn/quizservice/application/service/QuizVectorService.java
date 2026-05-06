@@ -5,8 +5,10 @@ import com.finlearn.quizservice.domain.entity.QuizTopic;
 import com.finlearn.quizservice.domain.enums.TopicStatus;
 import com.finlearn.quizservice.domain.repository.CrawledSourceRepository;
 import com.finlearn.quizservice.domain.repository.QuizTopicRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
@@ -77,7 +79,8 @@ public class QuizVectorService {
         for (int i = 0; i < splitDocs.size(); i++) {
             Document doc = splitDocs.get(i);
             // RDB랑 벡터DB는 같은 커넥션 풀을 쓰지 않는다고 함. 멱등성 보장을 위해 "topicId-CONTENT-index" 형태의 고유 ID 부여
-            String docId = String.format("%s-CONTENT-%d", topic.getId(), i);
+            String deterministicIdStr = String.format("%s-CONTENT-%d", topic.getId(), i);
+            String docId = UUID.nameUUIDFromBytes(deterministicIdStr.getBytes(StandardCharsets.UTF_8)).toString();
             Document idempotentDoc = new Document(docId, doc.getText(), doc.getMetadata());
 
             vectorStore.accept(List.of(idempotentDoc));
