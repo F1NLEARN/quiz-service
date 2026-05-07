@@ -33,7 +33,7 @@ import java.util.UUID;
  * 세션 생성, 다음 문제 조회, 답안 제출 엔드포인트를 제공한다.
  */
 @RestController
-@RequestMapping("/api/quiz/sessions")
+@RequestMapping("/api/v1/quiz/sessions")
 @RequiredArgsConstructor
 public class QuizSessionController {
 
@@ -44,7 +44,7 @@ public class QuizSessionController {
 
     /**
      * 학습 퀴즈 세션을 생성한다.
-     * POST /api/v1/quiz-sessions/learning
+     * POST /api/v1/quiz/sessions/learning
      */
     @PostMapping("/learning")
     public CommonResponse<CreateSessionResponse> createLearningSession(
@@ -60,7 +60,7 @@ public class QuizSessionController {
 
     /**
      * 포인트 퀴즈 세션을 생성한다.
-     * POST /api/v1/quiz-sessions/point
+     * POST /api/v1/quiz/sessions/point
      */
     @PostMapping("/point")
     public CommonResponse<CreateSessionResponse> createPointSession() {
@@ -73,7 +73,7 @@ public class QuizSessionController {
 
     /**
      * 다음 미풀이 문제를 조회한다.
-     * GET /api/v1/quiz-sessions/{sessionId}/quizzes/next
+     * GET /api/v1/quiz/sessions/{sessionId}/quizzes/next
      */
     @GetMapping("/{sessionId}/quizzes/next")
     public CommonResponse<NextQuizResponse> getNextQuiz(@PathVariable UUID sessionId) {
@@ -84,7 +84,7 @@ public class QuizSessionController {
 
     /**
      * 답안을 제출한다.
-     * POST /api/v1/quiz-sessions/{sessionId}/quizzes/{quizId}/answers
+     * POST /api/v1/quiz/sessions/{sessionId}/quizzes/{quizId}/answers
      */
     @PostMapping("/{sessionId}/quizzes/{quizId}/answers")
     public CommonResponse<SubmitAnswerResponse> submitAnswer(
@@ -100,7 +100,7 @@ public class QuizSessionController {
 
     /**
      * 퀴즈 세션을 종료한다.
-     * POST /api/v1/quiz-sessions/{sessionId}/close
+     * POST /api/v1/quiz/sessions/{sessionId}/close
      */
     @PostMapping("/{sessionId}/close")
     public CommonResponse<CloseSessionResponse> closeSession(@PathVariable UUID sessionId) {
