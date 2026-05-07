@@ -1,6 +1,6 @@
 package com.finlearn.quizservice.quizsession.presentation.dto;
 
-import com.finlearn.quizservice.domain.entity.QuizChoice;
+import com.finlearn.quizservice.quizetl.domain.entity.QuizChoice;
 
 /**
  * 선택지 응답 DTO.

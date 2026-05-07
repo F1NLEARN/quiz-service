@@ -1,6 +1,6 @@
 package com.finlearn.quizservice.quizsession.presentation.dto;
 
-import com.finlearn.quizservice.domain.entity.Quiz;
+import com.finlearn.quizservice.quizetl.domain.entity.Quiz;
 import com.finlearn.quizservice.quizsession.domain.QuizSessionQuiz;
 
 import java.util.List;

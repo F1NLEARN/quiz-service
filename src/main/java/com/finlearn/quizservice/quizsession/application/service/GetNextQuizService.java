@@ -1,7 +1,7 @@
 package com.finlearn.quizservice.quizsession.application.service;
 
-import com.finlearn.quizservice.domain.entity.Quiz;
-import com.finlearn.quizservice.infrastructure.repository.QuizJpaRepository;
+import com.finlearn.quizservice.quizetl.domain.entity.Quiz;
+import com.finlearn.quizservice.quizetl.infrastructure.repository.QuizJpaRepository;
 import com.finlearn.quizservice.quizsession.application.command.GetNextQuizCommand;
 import com.finlearn.quizservice.quizsession.domain.QuizSession;
 import com.finlearn.quizservice.quizsession.domain.QuizSessionQuiz;
