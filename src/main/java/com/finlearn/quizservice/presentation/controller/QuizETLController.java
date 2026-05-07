@@ -1,7 +1,9 @@
 package com.finlearn.quizservice.presentation.controller;
 
 import com.finlearn.common.response.CommonResponse;
+import com.finlearn.quizservice.application.service.QuizGeneratorService;
 import com.finlearn.quizservice.application.service.QuizTopicGeneratorService;
+import com.finlearn.quizservice.application.service.QuizVectorService;
 import com.finlearn.quizservice.application.service.WikiCrawlerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,8 @@ public class QuizETLController {
 
     private final QuizTopicGeneratorService quizTopicGeneratorService;
     private final WikiCrawlerService wikiCrawlerService;
+    private final QuizVectorService quizVectorService;
+    private final QuizGeneratorService quizGeneratorService;
 
     @PostMapping
     public CommonResponse<String> runFullPipeline(@RequestParam(required = false) Integer count) {
@@ -33,9 +37,11 @@ public class QuizETLController {
         // 2. 크롤링 실행
         wikiCrawlerService.crawlPendingTopics();
 
-        // TODO: 3. 텍스트 분할(Chunking) 및 임베딩 파이프라인 실행
-        // TODO: 4. 벡터 DB 기반 퀴즈 생성 로직 실행 (Dynamic RAG)
-        // TODO: 5. 최종 중복 제거 및 품질 검수 로직 실행
+        // 3. 청킹 및 임베딩
+        quizVectorService.vectorizeCrawledTopics();
+
+        // 4. 퀴즈 생성 및 품질 검증
+        quizGeneratorService.generateQuizzesFromEmbeddedTopics();
 
         return CommonResponse.success("전체 ETL 파이프라인 수동 실행 성공", null);
     }

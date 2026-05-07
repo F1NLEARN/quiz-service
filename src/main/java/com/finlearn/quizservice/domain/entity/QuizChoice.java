@@ -14,5 +14,5 @@ import lombok.Setter;
 public class QuizChoice {
     private int no;
     private String content;
-    private boolean isCorrect;
+    private boolean correct;
 }
