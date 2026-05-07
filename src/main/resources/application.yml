@@ -4,13 +4,18 @@ server:
 spring:
   application:
     name: quiz-service
+  profiles:
+    active: local
+    group:
+      docker: "kafka,topics"
   config:
     import: optional:configserver:http://localhost:8888
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:5432/${DB_NAME:quizdb}
+    url: jdbc:postgresql://localhost:5432/quizdb
     driver-class-name: org.postgresql.Driver
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:}
+<<<<<<< feat/8-quiz-etl
   jpa:
     hibernate:
       ddl-auto: update
@@ -49,6 +54,8 @@ spring:
         distance-type: COSINE_DISTANCE
         dimensions: 1536
         initialize-schema: true
+=======
+>>>>>>> develop
 
 eureka:
   instance:
@@ -57,22 +64,4 @@ eureka:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://${EUREKA_URL1:localhost}:8761/eureka/
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,prometheus
-  endpoint:
-    health:
-      show-details: always
-  tracing:
-    sampling:
-      probability: 1.0
-
-wiki:
-  api:
-    base-url: https://ko.wikipedia.org/w/api.php
-    contact-email: ${WIKI_CONTACT_EMAIL}
-  web-url-prefix: https://ko.wikipedia.org/wiki/
+      defaultZone: http://localhost:8761/eureka/
