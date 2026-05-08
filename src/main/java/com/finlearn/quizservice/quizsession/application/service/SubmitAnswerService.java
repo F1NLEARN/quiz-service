@@ -58,7 +58,7 @@ public class SubmitAnswerService {
         // 저장
         quizSessionRepository.save(session);
 
-        // 도메인 이벤트 발행 (Kafka 연동은 PR #5에서 처리)
+        // 도메인 이벤트 발행
         session.pullEvents().forEach(eventPublisher::publishEvent);
 
         return SubmitAnswerResponse.of(quizId, command.submitted(), correct, correctNo);
