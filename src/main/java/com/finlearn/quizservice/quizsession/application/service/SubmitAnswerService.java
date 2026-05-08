@@ -39,8 +39,11 @@ public class SubmitAnswerService {
         QuizSession session = findSessionOrThrow(command.sessionId());
         validateOwner(session, command.userId());
 
+        // orderNo로 세션 내 문제 조회 → quizId 추출
+        java.util.UUID quizId = session.findByOrderNo(command.orderNo()).getQuizId().value();
+
         // 문제 컨텐츠 조회
-        Quiz quiz = quizJpaRepository.findById(command.quizId())
+        Quiz quiz = quizJpaRepository.findById(quizId)
                 .orElseThrow(() -> new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_FOUND));
 
         // choices에서 정답 선택지 번호 추출
@@ -50,7 +53,7 @@ public class SubmitAnswerService {
         boolean correct = command.submitted() == correctNo;
 
         // 도메인에 답안 제출 위임
-        session.submitAnswer(QuizId.of(command.quizId()), command.submitted(), correct);
+        session.submitAnswer(QuizId.of(quizId), command.submitted(), correct);
 
         // 저장
         quizSessionRepository.save(session);
@@ -58,7 +61,7 @@ public class SubmitAnswerService {
         // 도메인 이벤트 발행 (Kafka 연동은 PR #5에서 처리)
         session.pullEvents().forEach(eventPublisher::publishEvent);
 
-        return SubmitAnswerResponse.of(command.quizId(), command.submitted(), correct, correctNo);
+        return SubmitAnswerResponse.of(quizId, command.submitted(), correct, correctNo);
     }
 
     /** choices 목록에서 isCorrect가 true인 선택지의 no를 추출한다 */

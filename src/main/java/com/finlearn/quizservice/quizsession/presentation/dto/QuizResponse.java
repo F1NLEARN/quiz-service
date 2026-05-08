@@ -7,10 +7,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 다음 문제 조회 응답 DTO.
- * 문제 컨텐츠를 반환하되 choices의 isCorrect는 포함하지 않는다.
+ * 문제 조회 응답 DTO.
+ * 문제 컨텐츠를 반환하되 choices의 correct는 포함하지 않는다.
  */
-public record NextQuizResponse(
+public record QuizResponse(
         UUID quizSessionQuizId,
         int orderNo,
         UUID quizId,
@@ -19,13 +19,12 @@ public record NextQuizResponse(
         List<ChoiceResponse> choices
 ) {
 
-    public static NextQuizResponse from(QuizSessionQuiz sessionQuiz, Quiz quiz) {
-        // choices 변환 시 isCorrect 제거
+    public static QuizResponse from(QuizSessionQuiz sessionQuiz, Quiz quiz) {
         List<ChoiceResponse> choices = quiz.getChoices().stream()
                 .map(ChoiceResponse::from)
                 .toList();
 
-        return new NextQuizResponse(
+        return new QuizResponse(
                 sessionQuiz.getId().value(),
                 sessionQuiz.getOrderNo(),
                 quiz.getId(),
