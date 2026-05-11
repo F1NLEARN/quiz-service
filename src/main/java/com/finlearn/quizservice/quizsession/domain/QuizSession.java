@@ -250,6 +250,16 @@ public class QuizSession {
     }
 
     /**
+     * orderNo로 세션에 포함된 문제를 조회한다.
+     */
+    public QuizSessionQuiz findByOrderNo(int orderNo) {
+        return quizzes.stream()
+                .filter(q -> q.getOrderNo() == orderNo)
+                .findFirst()
+                .orElseThrow(() -> new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_IN_SESSION));
+    }
+
+    /**
      * 아직 답안이 제출되지 않은 문제 중 orderNo가 가장 낮은 문제를 반환한다.
      * 모든 문제를 풀었으면 Optional.empty()를 반환한다.
      */
