@@ -49,7 +49,6 @@ public class ChatbotService {
     private final QuizSessionRepository quizSessionRepository;
     private final QuizJpaRepository quizJpaRepository;
     private final ChatConversationRepository chatConversationRepository;
-    private final RagContextRetriever ragContextRetriever;
     private final ChatClient chatClient;
 
     /**
@@ -64,14 +63,11 @@ public class ChatbotService {
         // 2. orderNo로 세션-문제 조회
         QuizSessionQuiz sessionQuiz = session.findByOrderNo(command.orderNo());
 
-        // 3. Quiz 엔티티 조회 (RAG 검색 키워드인 subTopic 확보)
+        // 3. Quiz 엔티티 조회 (answerExplanation 확보)
         Quiz quiz = quizJpaRepository.findById(sessionQuiz.getQuizId().value())
                 .orElseThrow(() -> new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_FOUND));
 
-        // 4. VectorStore에서 관련 문서 검색 (RAG)
-        String context = ragContextRetriever.retrieve(quiz.getSubTopic());
-
-        // 5. 대화 조회 또는 신규 생성 (문제별 대화 컨텍스트 유지)
+        // 4. 대화 조회 또는 신규 생성 (문제별 대화 컨텍스트 유지)
         ChatConversation conversation = chatConversationRepository
                 .findByQuizSessionQuizId(sessionQuiz.getId())
                 .orElseGet(() -> ChatConversation.create(
@@ -79,13 +75,13 @@ public class ChatbotService {
                         UserId.of(command.userId()),
                         session.getSessionType()));
 
-        // 6. 세션 유형에 따른 시스템 프롬프트 생성
-        String systemPrompt = buildSystemPrompt(session.getSessionType(), context);
+        // 5. 세션 유형에 따른 시스템 프롬프트 생성 (answerExplanation 직접 주입)
+        String systemPrompt = buildSystemPrompt(session.getSessionType(), quiz.getAnswerExplanation());
 
-        // 7. 이전 대화 기록을 Spring AI Message 형식으로 변환
+        // 6. 이전 대화 기록을 Spring AI Message 형식으로 변환
         List<Message> historyMessages = buildHistoryMessages(conversation.getMessages());
 
-        // 8. ChatClient 호출
+        // 7. ChatClient 호출
         String aiResponse = chatClient.prompt()
                 .system(systemPrompt)
                 .messages(historyMessages)
@@ -93,13 +89,12 @@ public class ChatbotService {
                 .call()
                 .content();
 
-        // 9. 사용자 메시지 + AI 응답을 대화에 추가하고 저장
+        // 8. 사용자 메시지 + AI 응답을 대화에 추가하고 저장
         conversation.addUserMessage(command.message());
         conversation.addAssistantMessage(aiResponse);
         chatConversationRepository.save(conversation);
 
-        log.info("[Chatbot] 응답 완료 - sessionId: {}, orderNo: {}, subTopic: {}",
-                command.sessionId(), command.orderNo(), quiz.getSubTopic());
+        log.info("[Chatbot] 응답 완료 - sessionId: {}, orderNo: {}", command.sessionId(), command.orderNo());
 
         return new ChatMessageResponse(aiResponse);
     }
@@ -144,11 +139,14 @@ public class ChatbotService {
      * - LEARNING: 정답 설명 포함 자유 응답 허용
      * - POINT: 힌트·개념 설명만, 정답 직접 언급 금지
      */
-    private String buildSystemPrompt(SessionType sessionType, String context) {
+    /**
+     * @param answerExplanation Quiz 엔티티의 해설 텍스트 (RAG 대신 직접 주입)
+     */
+    private String buildSystemPrompt(SessionType sessionType, String answerExplanation) {
         StringBuilder sb = new StringBuilder("""
             # Role: Financial Education AI Assistant
             # Constraints:
-            - Use the provided [Context] for accuracy.
+            - Use the provided [문제 해설] for accuracy.
             - Explain financial terms simply.
             - Answer in Korean (한국어로 답변하세요).
             """);
@@ -166,8 +164,8 @@ public class ChatbotService {
                 """);
         }
 
-        if (!context.isBlank()) {
-            sb.append("\n# Context:\n").append(context);
+        if (answerExplanation != null && !answerExplanation.isBlank()) {
+            sb.append("\n# 문제 해설:\n").append(answerExplanation);
         }
 
         return sb.toString();
