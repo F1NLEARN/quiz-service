@@ -44,6 +44,15 @@ public class SessionConceptSummary {
                 SessionConceptSummaryId.newId(), quizSessionId, userId, summaryContent);
     }
 
+    /**
+     * DB에서 읽어온 데이터로 재구성 — Infrastructure 레이어(JPA 엔티티)에서만 호출
+     */
+    public static SessionConceptSummary reconstruct(SessionConceptSummaryId id,
+                                                     QuizSessionId quizSessionId,
+                                                     UserId userId, String summaryContent) {
+        return new SessionConceptSummary(id, quizSessionId, userId, summaryContent);
+    }
+
     public SessionConceptSummaryId getId() { return id; }
     public QuizSessionId getQuizSessionId() { return quizSessionId; }
     public UserId getUserId() { return userId; }

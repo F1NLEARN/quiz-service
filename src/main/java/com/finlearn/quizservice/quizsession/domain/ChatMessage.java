@@ -24,6 +24,11 @@ public class ChatMessage {
         return new ChatMessage(ChatMessageId.newId(), role, content);
     }
 
+    /** DB에서 읽어온 데이터로 재구성 — Infrastructure 레이어(JPA 엔티티)에서만 호출 */
+    public static ChatMessage reconstruct(ChatMessageId id, MessageRole role, String content) {
+        return new ChatMessage(id, role, content);
+    }
+
     public ChatMessageId getId() { return id; }
     public MessageRole getRole() { return role; }
     public String getContent() { return content; }

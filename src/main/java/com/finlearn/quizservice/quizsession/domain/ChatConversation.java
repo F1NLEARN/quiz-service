@@ -52,6 +52,19 @@ public class ChatConversation {
     }
 
     /**
+     * DB에서 읽어온 데이터로 도메인 객체를 재구성한다.
+     * Infrastructure 레이어(Repository 구현체)에서만 호출한다.
+     */
+    public static ChatConversation reconstruct(ChatConversationId id,
+                                               QuizSessionQuizId quizSessionQuizId,
+                                               UserId userId, SessionType sessionType,
+                                               List<ChatMessage> existingMessages) {
+        ChatConversation conversation = new ChatConversation(id, quizSessionQuizId, userId, sessionType);
+        conversation.messages.addAll(existingMessages);
+        return conversation;
+    }
+
+    /**
      * 사용자 메시지를 대화에 추가한다.
      *
      * @param content 사용자가 입력한 텍스트
