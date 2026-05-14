@@ -25,6 +25,7 @@ public class CloseSessionService {
 
     private final QuizSessionRepository quizSessionRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final ConceptSummaryGenerationService conceptSummaryGenerationService;
 
     /**
      * 세션을 종료하고 결과를 반환한다.
@@ -44,6 +45,11 @@ public class CloseSessionService {
 
         quizSessionRepository.save(session);
         session.pullEvents().forEach(eventPublisher::publishEvent);
+
+        // 개념 정리 대상 문제가 있으면 비동기로 개념 정리 생성 (세션 종료 응답에 영향 없음)
+        if (session.hasConceptIncludedQuiz()) {
+            conceptSummaryGenerationService.generateAsync(session);
+        }
 
         return CloseSessionResponse.from(session);
     }
