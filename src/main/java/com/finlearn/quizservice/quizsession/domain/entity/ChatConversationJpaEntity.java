@@ -3,6 +3,7 @@ package com.finlearn.quizservice.quizsession.domain.entity;
 import com.finlearn.common.domain.BaseEntity;
 import com.finlearn.quizservice.quizsession.domain.ChatConversation;
 import com.finlearn.quizservice.quizsession.domain.ChatMessage;
+import java.util.List;
 import com.finlearn.quizservice.quizsession.domain.vo.ChatConversationId;
 import com.finlearn.quizservice.quizsession.domain.vo.QuizSessionQuizId;
 import com.finlearn.quizservice.quizsession.domain.vo.SessionType;
@@ -57,8 +58,8 @@ public class ChatConversationJpaEntity extends BaseEntity {
     private List<ChatMessageJpaEntity> messages = new ArrayList<>();
 
     /**
-     * 도메인 객체에서 JPA 엔티티를 생성한다.
-     * 자식 메시지 목록도 함께 변환하여 연관 관계를 설정한다.
+     * 신규 대화 생성 시에만 사용한다. (기존 엔티티가 없는 경우)
+     * 메시지 전체를 함께 변환하여 연관 관계를 설정한다.
      */
     public static ChatConversationJpaEntity fromDomain(ChatConversation conversation) {
         ChatConversationJpaEntity entity = new ChatConversationJpaEntity();
@@ -66,11 +67,23 @@ public class ChatConversationJpaEntity extends BaseEntity {
         entity.quizSessionQuizId = conversation.getQuizSessionQuizId().value();
         entity.userId = conversation.getUserId().value();
         entity.sessionType = conversation.getSessionType();
-        entity.messages.clear();
         conversation.getMessages().stream()
                 .map(m -> ChatMessageJpaEntity.fromDomain(m, entity))
                 .forEach(entity.messages::add);
         return entity;
+    }
+
+    /**
+     * 기존 엔티티에 신규 메시지만 추가한다.
+     * DELETE → INSERT 없이 INSERT만 발생하도록 기존 메시지 수 이후 인덱스부터 추가한다.
+     *
+     * @param newMessages 도메인의 전체 메시지 목록
+     */
+    public void appendNewMessages(List<ChatMessage> newMessages) {
+        int existingCount = this.messages.size();
+        for (int i = existingCount; i < newMessages.size(); i++) {
+            this.messages.add(ChatMessageJpaEntity.fromDomain(newMessages.get(i), this));
+        }
     }
 
     /**

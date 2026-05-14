@@ -19,9 +19,19 @@ public class ChatConversationRepositoryImpl implements ChatConversationRepositor
 
     private final ChatConversationJpaRepository jpaRepository;
 
+    /**
+     * 기존 대화가 있으면 신규 메시지만 추가(INSERT only),
+     * 없으면 전체 생성한다.
+     * orphanRemoval + CascadeType.ALL 환경에서 DELETE → INSERT 방지.
+     */
     @Override
     public ChatConversation save(ChatConversation conversation) {
-        ChatConversationJpaEntity entity = ChatConversationJpaEntity.fromDomain(conversation);
+        ChatConversationJpaEntity entity = jpaRepository.findById(conversation.getId().value())
+                .map(existing -> {
+                    existing.appendNewMessages(conversation.getMessages());
+                    return existing;
+                })
+                .orElseGet(() -> ChatConversationJpaEntity.fromDomain(conversation));
         return jpaRepository.save(entity).toDomain();
     }
 
