@@ -6,15 +6,20 @@ import com.finlearn.quizservice.quizsession.application.command.CloseSessionComm
 import com.finlearn.quizservice.quizsession.application.command.CreateLearningSessionCommand;
 import com.finlearn.quizservice.quizsession.application.command.CreatePointSessionCommand;
 import com.finlearn.quizservice.quizsession.application.command.GetQuizCommand;
+import com.finlearn.quizservice.quizsession.application.command.SelectConceptIncludesCommand;
 import com.finlearn.quizservice.quizsession.application.command.SubmitAnswerCommand;
 import com.finlearn.quizservice.quizsession.application.service.CloseSessionService;
 import com.finlearn.quizservice.quizsession.application.service.CreateQuizSessionService;
+import com.finlearn.quizservice.quizsession.application.service.GetConceptSummaryService;
 import com.finlearn.quizservice.quizsession.application.service.GetQuizService;
+import com.finlearn.quizservice.quizsession.application.service.SelectConceptIncludesService;
 import com.finlearn.quizservice.quizsession.application.service.SubmitAnswerService;
+import com.finlearn.quizservice.quizsession.presentation.dto.CloseSessionResponse;
+import com.finlearn.quizservice.quizsession.presentation.dto.ConceptSummaryResponse;
 import com.finlearn.quizservice.quizsession.presentation.dto.CreateLearningSessionRequest;
 import com.finlearn.quizservice.quizsession.presentation.dto.CreateSessionResponse;
-import com.finlearn.quizservice.quizsession.presentation.dto.CloseSessionResponse;
 import com.finlearn.quizservice.quizsession.presentation.dto.QuizResponse;
+import com.finlearn.quizservice.quizsession.presentation.dto.SelectConceptIncludesRequest;
 import com.finlearn.quizservice.quizsession.presentation.dto.SubmitAnswerRequest;
 import com.finlearn.quizservice.quizsession.presentation.dto.SubmitAnswerResponse;
 import jakarta.validation.Valid;
@@ -41,6 +46,8 @@ public class QuizSessionController {
     private final GetQuizService getQuizService;
     private final SubmitAnswerService submitAnswerService;
     private final CloseSessionService closeSessionService;
+    private final SelectConceptIncludesService selectConceptIncludesService;
+    private final GetConceptSummaryService getConceptSummaryService;
 
     /**
      * 학습 퀴즈 세션을 생성한다.
@@ -107,5 +114,30 @@ public class QuizSessionController {
         CloseSessionCommand command = new CloseSessionCommand(sessionId, SecurityUtil.getCurrentUserId());
         CloseSessionResponse response = closeSessionService.closeSession(command);
         return CommonResponse.success("퀴즈 세션이 종료되었습니다.", response);
+    }
+
+    /**
+     * 학습 퀴즈 개념 정리 대상 문제를 선택한다. (세션 종료 전 호출)
+     * POST /api/quiz/sessions/{sessionId}/concept-includes
+     */
+    @PostMapping("/{sessionId}/concept-includes")
+    public CommonResponse<Void> selectConceptIncludes(
+            @PathVariable UUID sessionId,
+            @Valid @RequestBody SelectConceptIncludesRequest request) {
+        SelectConceptIncludesCommand command = new SelectConceptIncludesCommand(
+                sessionId, SecurityUtil.getCurrentUserId(), request.orderNos()
+        );
+        selectConceptIncludesService.selectConceptIncludes(command);
+        return CommonResponse.success("개념 정리 대상 문제가 선택되었습니다.", null);
+    }
+
+    /**
+     * 세션 개념 정리를 조회한다. (세션 종료 후 비동기 생성 완료 시 조회 가능)
+     * GET /api/quiz/sessions/{sessionId}/concept-summary
+     */
+    @GetMapping("/{sessionId}/concept-summary")
+    public CommonResponse<ConceptSummaryResponse> getConceptSummary(@PathVariable UUID sessionId) {
+        ConceptSummaryResponse response = getConceptSummaryService.getConceptSummary(sessionId);
+        return CommonResponse.success("개념 정리를 조회했습니다.", response);
     }
 }
