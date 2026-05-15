@@ -1,7 +1,7 @@
 package com.finlearn.quizservice.quizsession.application.service;
 
+import com.finlearn.quizservice.quizetl.application.service.QuizCacheService;
 import com.finlearn.quizservice.quizetl.domain.entity.Quiz;
-import com.finlearn.quizservice.quizetl.infrastructure.repository.QuizJpaRepository;
 import com.finlearn.quizservice.quizsession.application.command.GetQuizCommand;
 import com.finlearn.quizservice.quizsession.domain.QuizSession;
 import com.finlearn.quizservice.quizsession.domain.QuizSessionQuiz;
@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GetQuizService {
 
     private final QuizSessionRepository quizSessionRepository;
-    private final QuizJpaRepository quizJpaRepository;
+    private final QuizCacheService quizCacheService;
 
     /**
      * orderNo에 해당하는 문제를 조회한다.
@@ -41,9 +41,9 @@ public class GetQuizService {
         // orderNo로 문제 조회
         QuizSessionQuiz sessionQuiz = session.findByOrderNo(command.orderNo());
 
-        // 문제 컨텐츠 조회
-        Quiz quiz = quizJpaRepository.findById(sessionQuiz.getQuizId().value())
-                .orElseThrow(() -> new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_FOUND));
+        // 문제 컨텐츠 조회 (캐시 우선)
+        Quiz quiz = quizCacheService.findById(sessionQuiz.getQuizId().value());
+        if (quiz == null) throw new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_FOUND);
 
         return QuizResponse.from(sessionQuiz, quiz);
     }

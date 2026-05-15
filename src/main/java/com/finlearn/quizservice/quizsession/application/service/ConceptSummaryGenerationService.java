@@ -4,8 +4,8 @@ import com.finlearn.quizservice.quizsession.domain.QuizSession;
 import com.finlearn.quizservice.quizsession.domain.QuizSessionQuiz;
 import com.finlearn.quizservice.quizsession.domain.SessionConceptSummary;
 import com.finlearn.quizservice.quizsession.domain.repository.SessionConceptSummaryRepository;
+import com.finlearn.quizservice.quizetl.application.service.QuizCacheService;
 import com.finlearn.quizservice.quizetl.domain.entity.Quiz;
-import com.finlearn.quizservice.quizetl.infrastructure.repository.QuizJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -13,7 +13,6 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -32,7 +31,7 @@ import java.util.stream.Collectors;
 public class ConceptSummaryGenerationService {
 
     private final ChatClient chatClient;
-    private final QuizJpaRepository quizJpaRepository;
+    private final QuizCacheService quizCacheService;
     private final SessionConceptSummaryRepository sessionConceptSummaryRepository;
 
     @Async
@@ -48,13 +47,11 @@ public class ConceptSummaryGenerationService {
                 return;
             }
 
-            // 대상 문제들의 answerExplanation 수집
+            // 대상 문제들의 answerExplanation 수집 (캐시 우선)
             String explanations = targets.stream()
                     .map(q -> {
-                        UUID quizId = q.getQuizId().value();
-                        return quizJpaRepository.findById(quizId)
-                                .map(Quiz::getAnswerExplanation)
-                                .orElse("");
+                        Quiz quiz = quizCacheService.findById(q.getQuizId().value());
+                        return quiz != null ? quiz.getAnswerExplanation() : "";
                     })
                     .filter(s -> !s.isBlank())
                     .collect(Collectors.joining("\n\n---\n\n"));
