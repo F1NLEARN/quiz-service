@@ -191,6 +191,26 @@ public class QuizSession {
     }
 
     /**
+     * 학습 퀴즈에서 개념 정리 대상 문제를 일괄 설정한다.
+     * 기존 선택을 모두 초기화하고 전달된 orderNo 목록만 true로 설정한다.
+     *
+     * @param orderNos 개념 정리 대상으로 선택된 문제 번호 목록
+     */
+    public void selectConceptIncludes(List<Integer> orderNos) {
+        if (sessionType != SessionType.LEARNING) {
+            throw new QuizSessionException(QuizSessionErrorCode.LEARNING_QUIZ_ONLY);
+        }
+        validateInProgress();
+        for (QuizSessionQuiz quiz : quizzes) {
+            if (orderNos.contains(quiz.getOrderNo())) {
+                if (!quiz.isConceptIncluded()) quiz.toggleConceptIncluded();
+            } else {
+                if (quiz.isConceptIncluded()) quiz.toggleConceptIncluded();
+            }
+        }
+    }
+
+    /**
      * 학습 퀴즈 세션을 종료한다. 점수와 무관하게 항상 PASS로 처리된다.
      */
     public void closeAsLearning() {
