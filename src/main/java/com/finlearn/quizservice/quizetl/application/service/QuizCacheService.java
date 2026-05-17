@@ -7,7 +7,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Quiz 조회 캐시 서비스.
@@ -34,5 +37,19 @@ public class QuizCacheService {
     @Transactional(readOnly = true)
     public Quiz findById(UUID id) {
         return quizJpaRepository.findById(id).orElse(null);
+    }
+
+    /**
+     * 여러 Quiz를 단일 IN 쿼리로 일괄 조회하여 Map으로 반환한다.
+     * N+1 방지 목적으로 사용하며, 조회 결과는 개별 캐시(@Cacheable)와 별도로 관리된다.
+     *
+     * @param ids Quiz UUID 목록
+     * @return UUID → Quiz 매핑
+     */
+    @Transactional(readOnly = true)
+    public Map<UUID, Quiz> findAllByIds(List<UUID> ids) {
+        return quizJpaRepository.findAllById(ids)
+                .stream()
+                .collect(Collectors.toMap(Quiz::getId, q -> q));
     }
 }
