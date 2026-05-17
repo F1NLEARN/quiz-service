@@ -13,6 +13,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -47,10 +49,18 @@ public class ConceptSummaryGenerationService {
                 return;
             }
 
-            // 대상 문제들의 answerExplanation 수집 (캐시 우선)
+            // 대상 문제 ID 목록 추출
+            List<UUID> quizIds = targets.stream()
+                    .map(q -> q.getQuizId().value())
+                    .toList();
+
+            // 단일 IN 쿼리로 일괄 조회 → Map 인덱싱 (N+1 방지)
+            Map<UUID, Quiz> quizMap = quizCacheService.findAllByIds(quizIds);
+
+            // answerExplanation 수집
             String explanations = targets.stream()
                     .map(q -> {
-                        Quiz quiz = quizCacheService.findById(q.getQuizId().value());
+                        Quiz quiz = quizMap.get(q.getQuizId().value());
                         return quiz != null ? quiz.getAnswerExplanation() : "";
                     })
                     .filter(s -> !s.isBlank())
