@@ -26,7 +26,7 @@ import java.util.UUID;
  * - POINT 세션: 힌트·개념 설명만, 정답 차단
  */
 @RestController
-@RequestMapping("/api/quiz/sessions")
+@RequestMapping("/api/v1/quiz/sessions")
 @RequiredArgsConstructor
 public class ChatbotController {
 
