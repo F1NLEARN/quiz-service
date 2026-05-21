@@ -25,7 +25,6 @@ import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
@@ -86,18 +85,19 @@ public class QuizVectorService {
         }
     }
 
-    @Transactional
     public void processTopic(QuizTopic topic) {
-        String keyword = topic.getSubTopic();
-        crawledSourceRepository.findByKeyword(keyword).ifPresentOrElse(source -> {
-            vectorizeSource(topic, source);
-            topic.updateStatus(TopicStatus.EMBEDDED);
-            quizTopicRepository.save(topic);
-            log.info("'{}' 소주제 벡터화 및 상태 업데이트 완료", keyword);
-        }, () -> {
-            log.warn("'{}' 소주제의 크롤링 소스를 찾을 수 없습니다.", keyword);
-            topic.updateStatus(TopicStatus.FAILED);
-            quizTopicRepository.save(topic);
+        transactionTemplate.executeWithoutResult(status -> {
+            String keyword = topic.getSubTopic();
+            crawledSourceRepository.findByKeyword(keyword).ifPresentOrElse(source -> {
+                vectorizeSource(topic, source);
+                topic.updateStatus(TopicStatus.EMBEDDED);
+                quizTopicRepository.save(topic);
+                log.info("'{}' 소주제 벡터화 및 상태 업데이트 완료", keyword);
+            }, () -> {
+                log.warn("'{}' 소주제의 크롤링 소스를 찾을 수 없습니다.", keyword);
+                topic.updateStatus(TopicStatus.FAILED);
+                quizTopicRepository.save(topic);
+            });
         });
     }
 

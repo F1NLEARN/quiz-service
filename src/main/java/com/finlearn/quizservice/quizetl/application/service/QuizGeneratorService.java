@@ -26,7 +26,6 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
@@ -128,85 +127,86 @@ public class QuizGeneratorService {
         }
     }
 
-    @Transactional
     public boolean generateQuizForTopic(QuizTopic topic) {
-        String keyword = topic.getSubTopic();
-        log.info("'{}' 소주제에 대한 RAG 기반 퀴즈 생성을 시작합니다.", keyword);
+        return Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            String keyword = topic.getSubTopic();
+            log.info("'{}' 소주제에 대한 RAG 기반 퀴즈 생성을 시작합니다.", keyword);
 
-        SearchRequest searchRequest = SearchRequest.builder().query(keyword).topK(3)
-                .filterExpression("type == 'CONTENT' && subTopic == '" + keyword + "'").build();
+            SearchRequest searchRequest = SearchRequest.builder().query(keyword).topK(3)
+                    .filterExpression("type == 'CONTENT' && subTopic == '" + keyword + "'").build();
 
-        List<Document> docs = vectorStore.similaritySearch(searchRequest);
-        String context = docs.stream().map(Document::getText).collect(Collectors.joining("\n\n"));
+            List<Document> docs = vectorStore.similaritySearch(searchRequest);
+            String context = docs.stream().map(Document::getText).collect(Collectors.joining("\n\n"));
 
-        if (context.isEmpty()) {
-            log.warn("'{}' 소주제에 대한 검색 결과가 없어 퀴즈 생성을 건너뜁니다.", keyword);
-            topic.updateStatus(TopicStatus.FAILED);
+            if (context.isEmpty()) {
+                log.warn("'{}' 소주제에 대한 검색 결과가 없어 퀴즈 생성을 건너뜁니다.", keyword);
+                topic.updateStatus(TopicStatus.FAILED);
+                quizTopicRepository.save(topic);
+                return false;
+            }
+
+            String systemPrompt = """
+                    당신은 투자 초보자를 위한 최고의 금융 투자 교육 전문가입니다. 제공된 [문맥]의 내용을 바탕으로 투자 지식을 쉽게 학습할 수 있는 고품질 4지선다형 퀴즈를 만듭니다.
+
+                    요구사항:
+                    1. **초보자 눈높이**: 개념을 억지로 꼬아 어렵게 만들기보다, 투자 입문자가 핵심 투자 메커니즘을 확실하게 이해할 수 있도록 명확하고 쉬운 설명과 문장을 사용하세요.
+                    2. **투자 실전성**: 이 개념이 실제 주식, ETF, 혹은 선물 거래 상황에서 어떻게 작동하는지, 투자자에게 어떤 실질적 의미를 가지는지 이해를 돕는 직관적인 질문과 해설을 작성해 주세요.
+                    3. **자연스러운 문장**: 질문과 해설 모두에서 '제시된 문맥에 따르면', '지문에 의하면'과 같이 문맥 출처를 상투적으로 언급하는 표현은 절대 사용하지 마세요. 마치 원래 알고 있는 투자 상식을 풍부하게 설명하듯 자연스럽게 작성하세요.
+                    4. **표준 퀴즈 형식**: '다음 중 ...으로 옳은 것은?' 또는 '다음 상황에서 ...으로 가장 적절한 설명은?'과 같이 핵심 지식을 실전적으로 묻는 형식을 사용하세요.
+                    5. **해설**: 정답이 되는 이유뿐만 아니라, 오답들이 왜 틀렸는지 초보자의 관점에서 금융/투자 개념 위주로 친절하고 상세하게 풀어 설명해 주세요.
+                    """;
+
+            String userPrompt = String.format("""
+                    아래 [키워드]와 [문맥]을 사용하여 퀴즈를 생성해 주세요.
+
+                    [키워드]
+                    %s
+
+                    [문맥]
+                    %s
+                    """, keyword, context);
+
+            QuizAiResponse response = callChatWithRetry(systemPrompt, userPrompt);
+
+            // 중복 체크
+            if (quizDeduplicationService.isTooSimilarToExistingQuizzes(response.question())) {
+                log.warn("생성된 퀴즈가 기존 문제와 너무 유사하여 저장하지 않습니다: {}", response.question());
+                quizGenerationLogService.saveFailureLog(topic.getMainTopic(), keyword, response, "중복된 문제로 판명됨");
+                topic.updateStatus(TopicStatus.FAILED);
+                quizTopicRepository.save(topic);
+                return false;
+            }
+
+            // 응답 데이터를 엔티티로 변환
+            CrawledSource source = crawledSourceRepository.findByKeyword(keyword).orElse(null);
+            Quiz quiz = Quiz.builder().quizTopicId(topic.getId()).crawledSourceId(source != null ? source.getId() : null)
+                    .title(response.title()).question(response.question()).answerExplanation(response.answerExplanation())
+                    .mainTopic(topic.getMainTopic()).subTopic(topic.getSubTopic())
+                    .choices(response.choices().stream()
+                            .map(c -> QuizChoice.builder().no(c.no()).content(c.content()).correct(c.correct()).build())
+                            .collect(Collectors.toList()))
+                    .build();
+
+            // 품질 검사
+            if (!quizQualityService.inspectQuizQuality(quiz, context)) {
+                log.warn("'{}' 퀴즈가 품질 검사를 통과하지 못해 저장을 건너뜜.", keyword);
+                quizGenerationLogService.saveFailureLog(topic.getMainTopic(), keyword, response, "AI 품질 검사 통과 실패");
+                topic.updateStatus(TopicStatus.FAILED);
+                quizTopicRepository.save(topic);
+                return false;
+            }
+
+            quizRepository.save(quiz);
+            quizGenerationLogService.saveSuccessLog(quiz);
+            topic.updateStatus(TopicStatus.COMPLETED);
             quizTopicRepository.save(topic);
-            return false;
-        }
+            log.info("'{}' 퀴즈 생성 및 품질 검사 완료, DB 저장 성공", keyword);
 
-        String systemPrompt = """
-                당신은 투자 초보자를 위한 최고의 금융 투자 교육 전문가입니다. 제공된 [문맥]의 내용을 바탕으로 투자 지식을 쉽게 학습할 수 있는 고품질 4지선다형 퀴즈를 만듭니다.
-
-                요구사항:
-                1. **초보자 눈높이**: 개념을 억지로 꼬아 어렵게 만들기보다, 투자 입문자가 핵심 투자 메커니즘을 확실하게 이해할 수 있도록 명확하고 쉬운 설명과 문장을 사용하세요.
-                2. **투자 실전성**: 이 개념이 실제 주식, ETF, 혹은 선물 거래 상황에서 어떻게 작동하는지, 투자자에게 어떤 실질적 의미를 가지는지 이해를 돕는 직관적인 질문과 해설을 작성해 주세요.
-                3. **자연스러운 문장**: 질문과 해설 모두에서 '제시된 문맥에 따르면', '지문에 의하면'과 같이 문맥 출처를 상투적으로 언급하는 표현은 절대 사용하지 마세요. 마치 원래 알고 있는 투자 상식을 풍부하게 설명하듯 자연스럽게 작성하세요.
-                4. **표준 퀴즈 형식**: '다음 중 ...으로 옳은 것은?' 또는 '다음 상황에서 ...으로 가장 적절한 설명은?'과 같이 핵심 지식을 실전적으로 묻는 형식을 사용하세요.
-                5. **해설**: 정답이 되는 이유뿐만 아니라, 오답들이 왜 틀렸는지 초보자의 관점에서 금융/투자 개념 위주로 친절하고 상세하게 풀어 설명해 주세요.
-                """;
-
-        String userPrompt = String.format("""
-                아래 [키워드]와 [문맥]을 사용하여 퀴즈를 생성해 주세요.
-
-                [키워드]
-                %s
-
-                [문맥]
-                %s
-                """, keyword, context);
-
-        QuizAiResponse response = callChatWithRetry(systemPrompt, userPrompt);
-
-        // 중복 체크
-        if (quizDeduplicationService.isTooSimilarToExistingQuizzes(response.question())) {
-            log.warn("생성된 퀴즈가 기존 문제와 너무 유사하여 저장하지 않습니다: {}", response.question());
-            quizGenerationLogService.saveFailureLog(topic.getMainTopic(), keyword, response, "중복된 문제로 판명됨");
-            topic.updateStatus(TopicStatus.FAILED);
-            quizTopicRepository.save(topic);
-            return false;
-        }
-
-        // 응답 데이터를 엔티티로 변환
-        CrawledSource source = crawledSourceRepository.findByKeyword(keyword).orElse(null);
-        Quiz quiz = Quiz.builder().quizTopicId(topic.getId()).crawledSourceId(source != null ? source.getId() : null)
-                .title(response.title()).question(response.question()).answerExplanation(response.answerExplanation())
-                .mainTopic(topic.getMainTopic()).subTopic(topic.getSubTopic())
-                .choices(response.choices().stream()
-                        .map(c -> QuizChoice.builder().no(c.no()).content(c.content()).correct(c.correct()).build())
-                        .collect(Collectors.toList()))
-                .build();
-
-        // 품질 검사
-        if (!quizQualityService.inspectQuizQuality(quiz, context)) {
-            log.warn("'{}' 퀴즈가 품질 검사를 통과하지 못해 저장을 건너뜜.", keyword);
-            quizGenerationLogService.saveFailureLog(topic.getMainTopic(), keyword, response, "AI 품질 검사 통과 실패");
-            topic.updateStatus(TopicStatus.FAILED);
-            quizTopicRepository.save(topic);
-            return false;
-        }
-
-        quizRepository.save(quiz);
-        quizGenerationLogService.saveSuccessLog(quiz);
-        topic.updateStatus(TopicStatus.COMPLETED);
-        quizTopicRepository.save(topic);
-        log.info("'{}' 퀴즈 생성 및 품질 검사 완료, DB 저장 성공", keyword);
-
-        // 중복 체크를 위해 퀴즈 질문도 벡터 DB에 저장
-        vectorStore.accept(List.of(new Document(quiz.getQuestion(),
-                Map.of("type", "QUIZ", "quizId", quiz.getId().toString(), "topicId", topic.getId().toString()))));
-        return true;
+            // 중복 체크를 위해 퀴즈 질문도 벡터 DB에 저장
+            vectorStore.accept(List.of(new Document(quiz.getQuestion(),
+                    Map.of("type", "QUIZ", "quizId", quiz.getId().toString(), "topicId", topic.getId().toString()))));
+            return true;
+        }));
     }
 
     private QuizAiResponse callChatWithRetry(String systemPrompt, String userPrompt) {
