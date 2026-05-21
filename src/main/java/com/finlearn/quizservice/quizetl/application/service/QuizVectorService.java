@@ -1,11 +1,20 @@
 package com.finlearn.quizservice.quizetl.application.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finlearn.common.exception.InternalServerException;
 import com.finlearn.quizservice.quizetl.domain.entity.CrawledSource;
 import com.finlearn.quizservice.quizetl.domain.entity.QuizTopic;
 import com.finlearn.quizservice.quizetl.domain.enums.TopicStatus;
 import com.finlearn.quizservice.quizetl.domain.repository.CrawledSourceRepository;
 import com.finlearn.quizservice.quizetl.domain.repository.QuizTopicRepository;
+import com.finlearn.quizservice.quizetl.infrastructure.kafka.event.QuizEmbeddedEvent;
+import com.finlearn.quizservice.quizsession.infrastructure.outbox.OutboxEvent;
+import com.finlearn.quizservice.quizsession.infrastructure.outbox.OutboxEventRepository;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -14,8 +23,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Slf4j
 @Service
@@ -25,18 +36,53 @@ public class QuizVectorService {
     private final QuizTopicRepository quizTopicRepository;
     private final CrawledSourceRepository crawledSourceRepository;
     private final VectorStore vectorStore;
+    private final OutboxEventRepository outboxEventRepository;
+    private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
-    public void vectorizeCrawledTopics() {
+    @Value("${kafka.topics.quiz.embedded:finlearn-quiz-embedded}")
+    private String topicEmbedded;
+
+    public void vectorizeCrawledTopics(UUID userId, String email, String role) {
         log.info("수집 완료된 모든 소주제들에 대한 벡터화를 시작합니다.");
         List<QuizTopic> crawledTopics = quizTopicRepository.findByStatus(TopicStatus.CRAWLED);
         log.info("벡터화 대기 중인 소주제 {}개", crawledTopics.size());
 
+        int successCount = 0;
+
         for (QuizTopic topic : crawledTopics) {
             try {
                 processTopic(topic);
+                successCount++;
             } catch (Exception e) {
-                log.error("'{}' 소주제 처리 중 오류 발생: {}", topic.getSubTopic(), e.getMessage());
+                log.error("'{}' 소주제 처리 중 오류 발생 (해당 소주제를 FAILED로 마크하고 진행합니다): {}", topic.getSubTopic(), e.getMessage());
+                
+                // 트랜잭션 단위로 이 소주제의 상태를 FAILED로 격리 저장
+                transactionTemplate.executeWithoutResult(status -> {
+                    topic.updateStatus(TopicStatus.FAILED);
+                    quizTopicRepository.save(topic);
+                });
             }
+        }
+
+        if (successCount > 0) {
+            log.info("벡터화 배치 끝. 성공한 토픽이 있으므로 embedded 이벤트 outbox에 저장 시작");
+
+            // 모든 벡터화가 완료된 후 Outbox에 이벤트 저장
+            transactionTemplate.executeWithoutResult(status -> {
+                QuizEmbeddedEvent event = new QuizEmbeddedEvent(userId, email, role, LocalDateTime.now());
+
+                try {
+                    String json = objectMapper.writeValueAsString(event);
+                    outboxEventRepository.save(
+                            OutboxEvent.create(topicEmbedded, userId != null ? userId.toString() : "SYSTEM", json));
+                    log.info("embedded 이벤트 outbox에 저장 완료");
+                } catch (JsonProcessingException e) {
+                    throw new InternalServerException("이벤트 직렬화 실패: " + e.getMessage());
+                }
+            });
+        } else {
+            log.info("벡터화 배치 끝. 성공한 토픽이 없어 이벤트를 발행하지 않습니다.");
         }
     }
 
@@ -48,7 +94,11 @@ public class QuizVectorService {
             topic.updateStatus(TopicStatus.EMBEDDED);
             quizTopicRepository.save(topic);
             log.info("'{}' 소주제 벡터화 및 상태 업데이트 완료", keyword);
-        }, () -> log.warn("'{}' 소주제의 크롤링 소스를 찾을 수 없습니다.", keyword));
+        }, () -> {
+            log.warn("'{}' 소주제의 크롤링 소스를 찾을 수 없습니다.", keyword);
+            topic.updateStatus(TopicStatus.FAILED);
+            quizTopicRepository.save(topic);
+        });
     }
 
     private void vectorizeSource(QuizTopic topic, CrawledSource source) {
@@ -76,19 +126,23 @@ public class QuizVectorService {
 
         log.info("'{}' 소주제를 {}개의 청크로 분리하여 저장 시작", topic.getSubTopic(), splitDocs.size());
 
+        List<Document> idempotentDocs = new ArrayList<>();
         for (int i = 0; i < splitDocs.size(); i++) {
             Document doc = splitDocs.get(i);
             // RDB랑 벡터DB는 같은 커넥션 풀을 쓰지 않는다고 함. 멱등성 보장을 위해 "topicId-CONTENT-index" 형태의 고유 ID 부여
             String deterministicIdStr = String.format("%s-CONTENT-%d", topic.getId(), i);
             String docId = UUID.nameUUIDFromBytes(deterministicIdStr.getBytes(StandardCharsets.UTF_8)).toString();
-            Document idempotentDoc = new Document(docId, doc.getText(), doc.getMetadata());
+            idempotentDocs.add(new Document(docId, doc.getText(), doc.getMetadata()));
+        }
 
-            vectorStore.accept(List.of(idempotentDoc));
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
+        // 한 번에 모든 청크를 벡터 DB에 저장 (API 호출 1회로 압축)
+        vectorStore.accept(idempotentDocs);
+
+        try {
+            // 구글 제미나이 무료 티어 제한(15 RPM)을 절대 넘지 않도록 5초 대기 (1분에 최대 12회 호출)
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -122,7 +176,7 @@ public class QuizVectorService {
 
     private String removeEmptySections(String content) {
         String[] lines = content.split("\n");
-        java.util.List<String> result = new java.util.ArrayList<>();
+        List<String> result = new ArrayList<>();
 
         // 현재 유효하다고 판단된 가장 상위(숫자가 작은) 헤더 레벨
         int lastValidHeaderLevel = Integer.MAX_VALUE;
@@ -150,7 +204,7 @@ public class QuizVectorService {
             }
         }
 
-        java.util.Collections.reverse(result);
+        Collections.reverse(result);
         return String.join("\n", result);
     }
 

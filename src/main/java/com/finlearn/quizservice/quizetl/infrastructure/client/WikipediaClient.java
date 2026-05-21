@@ -52,7 +52,8 @@ public class WikipediaClient implements WikipediaPort {
             }
 
         } catch (Exception e) {
-            log.error("위키피디아 API 호출 중 오류 발생: {}", e.getMessage());
+            log.error("위키피디아 API 호출 중 네트워크/인프라 오류 발생: {}", e.getMessage());
+            throw new RuntimeException("Wikipedia API 호출 실패: " + keyword, e);
         }
 
         return null;
