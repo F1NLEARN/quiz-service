@@ -4,8 +4,8 @@ import com.finlearn.quizservice.quizsession.domain.QuizSession;
 import com.finlearn.quizservice.quizsession.domain.QuizSessionQuiz;
 import com.finlearn.quizservice.quizsession.domain.SessionConceptSummary;
 import com.finlearn.quizservice.quizsession.domain.repository.SessionConceptSummaryRepository;
+import com.finlearn.quizservice.quizetl.application.service.QuizCacheService;
 import com.finlearn.quizservice.quizetl.domain.entity.Quiz;
-import com.finlearn.quizservice.quizetl.infrastructure.repository.QuizJpaRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -13,6 +13,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,7 +33,7 @@ import java.util.stream.Collectors;
 public class ConceptSummaryGenerationService {
 
     private final ChatClient chatClient;
-    private final QuizJpaRepository quizJpaRepository;
+    private final QuizCacheService quizCacheService;
     private final SessionConceptSummaryRepository sessionConceptSummaryRepository;
 
     @Async
@@ -48,13 +49,19 @@ public class ConceptSummaryGenerationService {
                 return;
             }
 
-            // 대상 문제들의 answerExplanation 수집
+            // 대상 문제 ID 목록 추출
+            List<UUID> quizIds = targets.stream()
+                    .map(q -> q.getQuizId().value())
+                    .toList();
+
+            // 단일 IN 쿼리로 일괄 조회 → Map 인덱싱 (N+1 방지)
+            Map<UUID, Quiz> quizMap = quizCacheService.findAllByIds(quizIds);
+
+            // answerExplanation 수집
             String explanations = targets.stream()
                     .map(q -> {
-                        UUID quizId = q.getQuizId().value();
-                        return quizJpaRepository.findById(quizId)
-                                .map(Quiz::getAnswerExplanation)
-                                .orElse("");
+                        Quiz quiz = quizMap.get(q.getQuizId().value());
+                        return quiz != null ? quiz.getAnswerExplanation() : "";
                     })
                     .filter(s -> !s.isBlank())
                     .collect(Collectors.joining("\n\n---\n\n"));

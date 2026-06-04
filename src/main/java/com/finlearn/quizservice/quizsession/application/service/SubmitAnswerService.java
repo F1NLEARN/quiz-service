@@ -1,8 +1,8 @@
 package com.finlearn.quizservice.quizsession.application.service;
 
+import com.finlearn.quizservice.quizetl.application.service.QuizCacheService;
 import com.finlearn.quizservice.quizetl.domain.entity.Quiz;
 import com.finlearn.quizservice.quizetl.domain.entity.QuizChoice;
-import com.finlearn.quizservice.quizetl.infrastructure.repository.QuizJpaRepository;
 import com.finlearn.quizservice.quizsession.application.command.SubmitAnswerCommand;
 import com.finlearn.quizservice.quizsession.domain.QuizSession;
 import com.finlearn.quizservice.quizsession.domain.exception.QuizSessionErrorCode;
@@ -27,7 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class SubmitAnswerService {
 
     private final QuizSessionRepository quizSessionRepository;
-    private final QuizJpaRepository quizJpaRepository;
+    private final QuizCacheService quizCacheService;
     private final ApplicationEventPublisher eventPublisher;
 
     /**
@@ -42,9 +42,9 @@ public class SubmitAnswerService {
         // orderNo로 세션 내 문제 조회 → quizId 추출
         java.util.UUID quizId = session.findByOrderNo(command.orderNo()).getQuizId().value();
 
-        // 문제 컨텐츠 조회
-        Quiz quiz = quizJpaRepository.findById(quizId)
-                .orElseThrow(() -> new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_FOUND));
+        // 문제 컨텐츠 조회 (캐시 우선)
+        Quiz quiz = quizCacheService.findById(quizId);
+        if (quiz == null) throw new QuizSessionException(QuizSessionErrorCode.QUIZ_NOT_FOUND);
 
         // choices에서 정답 선택지 번호 추출
         int correctNo = extractCorrectNo(quiz);
