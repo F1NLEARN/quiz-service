@@ -68,7 +68,7 @@ public class QuizQualityService {
                 1. 문맥상 정답이 확실하고 논리적인가?
                 2. 문제 자체에 오류(중복 정답, 정답 없음, 사실 관계 오류 등)가 없는가?
                 3. 선택지가 서로 명확히 구별되어 혼동을 주지 않는가?
-                4. **이 퀴즈의 내용이 제시된 [대주제]와 실질적으로 관련이 있는 금융/경제 지식인가?** 만약 가수, 연예인, 무관한 일반 상식 등의 내용이라면 반드시 탈락(passed: false)시켜주세요.
+                4. **이 퀴즈의 내용이 제시된 [대주제]와 실질적으로 관련이 있는 금융/투자/경제 지식인가?** 단순 공학적 기술 설명(예: HBM 반도체 작동 메커니즘, 자율주행 센서 장치, 배터리 화학 반응 등)이나 가수, 연예인, 무관한 일반 상식 등의 내용이라면 반드시 탈락(passed: false)시켜주세요.
 
                 모든 항목을 통과하면 passed를 true로, 하나라도 문제가 있다면 false로 응답하고 구체적인 이유(reason)를 적어주세요.
                 """;
@@ -90,20 +90,61 @@ public class QuizQualityService {
                 """, quiz.getMainTopic().getDescription(), context, quiz.getQuestion(), choicesText,
                 quiz.getAnswerExplanation());
 
-        try {
-            QualityReviewResponse response = chatClient.prompt().system(systemPrompt).user(userPrompt).call()
-                    .entity(QualityReviewResponse.class);
+        QualityReviewResponse response = callChatWithRetry(systemPrompt, userPrompt);
 
-            if (response.passed()) {
-                log.info("AI 자가 검사 통과");
-                return true;
-            } else {
-                log.warn("AI 자가 검사 실패: {}", response.reason());
-                return false;
-            }
-        } catch (Exception e) {
-            log.error("AI 자가 검사 중 오류 발생: {}", e.getMessage());
+        if (response.passed()) {
+            log.info("AI 자가 검사 통과");
+            return true;
+        } else {
+            log.warn("AI 자가 검사 실패: {}", response.reason());
             return false;
         }
+    }
+
+    private QualityReviewResponse callChatWithRetry(String systemPrompt, String userPrompt) {
+        int maxAttempts = 5;
+        int delayMs = 60000;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                return chatClient.prompt()
+                        .system(systemPrompt)
+                        .user(userPrompt)
+                        .call()
+                        .entity(QualityReviewResponse.class);
+            } catch (Exception e) {
+                if (attempt == maxAttempts) {
+                    throw e;
+                }
+                if (isRateLimitException(e)) {
+                    log.warn("Gemini API Rate Limit (429) 감지됨. {}초 대기 후 재시도합니다... (시도 {}/{})", delayMs / 1000, attempt, maxAttempts);
+                    try {
+                        Thread.sleep(delayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("API 재시도 대기 중 인터럽트 발생", ie);
+                    }
+                } else {
+                    log.warn("Gemini API 호출 중 오류 발생. 5초 후 재시도합니다... (시도 {}/{}) - 에러: {}", attempt, maxAttempts, e.getMessage());
+                    try {
+                        Thread.sleep(5000);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("API 재시도 대기 중 인터럽트 발생", ie);
+                    }
+                }
+            }
+        }
+        throw new RuntimeException("모든 API 재시도 횟수 초과");
+    }
+
+    private boolean isRateLimitException(Throwable e) {
+        if (e == null) {
+            return false;
+        }
+        String msg = e.getMessage();
+        if (msg != null && (msg.contains("429") || msg.contains("quota") || msg.contains("Limit") || msg.contains("Rate"))) {
+            return true;
+        }
+        return isRateLimitException(e.getCause());
     }
 }

@@ -31,37 +31,37 @@ public class QuizGenerationLog extends BaseEntity {
     @Column(name = "quiz_generation_logs_id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "crawled_sources_id", nullable = false)
+    @Column(name = "crawled_sources_id", nullable = true)
     private UUID crawledSourceId;
 
-    @Column(name = "quizzes_id", nullable = false)
+    @Column(name = "quizzes_id", nullable = true)
     private UUID quizId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private QuizGenerationStatus status;
+    private QuizGenerationStatus status = QuizGenerationStatus.FAILED;
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
-    @Column(name = "quiz_title", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "quiz_title", columnDefinition = "TEXT", nullable = true)
     private String quizTitle;
 
-    @Column(name = "quiz_question", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "quiz_question", columnDefinition = "TEXT", nullable = true)
     private String quizQuestion;
 
-    @Column(name = "quiz_answer_explanation", columnDefinition = "TEXT", nullable = false)
+    @Column(name = "quiz_answer_explanation", columnDefinition = "TEXT", nullable = true)
     private String quizAnswerExplanation;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "quiz_choices", columnDefinition = "json", nullable = false)
+    @Column(name = "quiz_choices", columnDefinition = "json", nullable = true)
     private List<QuizChoice> quizChoices;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "quiz_main_topic", nullable = false)
+    @Column(name = "quiz_main_topic", nullable = true)
     private MainTopic quizMainTopic;
 
-    @Column(name = "quiz_sub_topic", nullable = false)
+    @Column(name = "quiz_sub_topic", nullable = true)
     private String quizSubTopic;
 
     @Builder
@@ -78,5 +78,20 @@ public class QuizGenerationLog extends BaseEntity {
         this.quizChoices = quizChoices;
         this.quizMainTopic = quizMainTopic;
         this.quizSubTopic = quizSubTopic;
+    }
+
+    public static QuizGenerationLog success(Quiz quiz) {
+        return QuizGenerationLog.builder().crawledSourceId(quiz.getCrawledSourceId()).quizId(quiz.getId())
+                .status(QuizGenerationStatus.SUCCESS).quizTitle(quiz.getTitle()).quizQuestion(quiz.getQuestion())
+                .quizAnswerExplanation(quiz.getAnswerExplanation()).quizChoices(quiz.getChoices())
+                .quizMainTopic(quiz.getMainTopic()).quizSubTopic(quiz.getSubTopic()).build();
+    }
+
+    public static QuizGenerationLog failed(CrawledSource source, MainTopic mainTopic, String subTopic, String title,
+            String question, String explanation, List<QuizChoice> choices, String errorMessage) {
+        return QuizGenerationLog.builder().crawledSourceId(source != null ? source.getId() : null).quizId(null)
+                .status(QuizGenerationStatus.FAILED).errorMessage(errorMessage).quizTitle(title).quizQuestion(question)
+                .quizAnswerExplanation(explanation).quizChoices(choices).quizMainTopic(mainTopic).quizSubTopic(subTopic)
+                .build();
     }
 }
